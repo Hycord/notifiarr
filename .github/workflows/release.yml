@@ -47,5 +47,5 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ steps.vars.outputs.repo_owner_lower }}/irc-notify:latest
-            ghcr.io/${{ steps.vars.outputs.repo_owner_lower }}/irc-notify:${{ steps.vars.outputs.sha_short }}
+            ghcr.io/${{ steps.vars.outputs.repo_owner_lower }}/notifiarr:latest
+            ghcr.io/${{ steps.vars.outputs.repo_owner_lower }}/notifiarr:${{ steps.vars.outputs.sha_short }}
