@@ -1,16 +1,45 @@
 'use client';
 
 import { useTheme } from 'next-themes';
-import { Button } from '@/components/ui/button';
 import { Sun, Moon } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 
-export function ThemeToggle() {
+interface ThemeToggleProps {
+  variant?: 'icon' | 'switch';
+  className?: string;
+}
+
+export function ThemeToggle({ variant = 'switch', className }: ThemeToggleProps) {
   const { resolvedTheme, setTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
-  const toggle = () => setTheme(isDark ? 'light' : 'dark');
+
+  if (variant === 'icon') {
+    return (
+      <button
+        type="button"
+        aria-label="Toggle theme"
+        onClick={() => setTheme(isDark ? 'light' : 'dark')}
+        className={cn(
+          'inline-flex items-center justify-center rounded-md border px-2 py-2 text-sm hover:bg-muted transition-colors',
+          className
+        )}
+      >
+        {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </button>
+    );
+  }
+
   return (
-    <Button variant="outline" size="icon" aria-label="Toggle theme" onClick={toggle}>
-      {isDark ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-    </Button>
+    <div className={cn('flex items-center gap-3', className)}>
+      <Switch
+        id="theme-mode"
+        checked={isDark}
+        onCheckedChange={(checked) => setTheme(checked ? 'dark' : 'light')}
+      />
+      <label htmlFor="theme-mode" className="text-sm cursor-pointer select-none">
+        {isDark ? 'Dark mode' : 'Light mode'}
+      </label>
+    </div>
   );
 }

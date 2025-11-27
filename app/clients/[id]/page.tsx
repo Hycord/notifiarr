@@ -1,7 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useClient, useUpdateClient } from '@/hooks/use-config-queries';
 import { clientConfigSchema, type ClientConfigFormData } from '@/lib/schemas';
@@ -11,12 +11,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { KeyValueEditor, StringArrayEditor } from '@/components/forms/key-value-editor';
 import { ParserRulesEditor } from '@/components/forms/parser-rules-editor';
 
 export default function EditClientPage() {
+  const DEBUG_FORMS = process.env.NEXT_PUBLIC_DEBUG_FORMS === 'true';
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
@@ -51,6 +52,27 @@ export default function EditClientPage() {
   const form = useForm<ClientConfigFormData>({
     resolver: zodResolver(clientConfigSchema),
     mode: 'onChange',
+    // Provide stable defaults to avoid undefined-driven render churn
+    defaultValues: {
+      id: (params.id as string) || '',
+      name: '',
+      enabled: true,
+      logDirectory: '',
+      discovery: {
+        patterns: {},
+        pathExtraction: {},
+      },
+      serverDiscovery: {
+        type: 'static',
+        servers: [],
+      } as any,
+      fileType: {
+        type: 'text',
+        encoding: 'utf-8',
+      } as any,
+      parserRules: [],
+      metadata: {},
+    } as any,
   });
 
   const {
@@ -60,18 +82,31 @@ export default function EditClientPage() {
     formState: { errors },
   } = form;
 
-  const enabled = watch('enabled');
+  // Use Controller for boolean switch to avoid render loops
   const serverDiscovery = watch('serverDiscovery');
   const fileType = watch('fileType');
   const parserRules = watch('parserRules');
   const discovery = watch('discovery');
   const metadata = watch('metadata');
 
-  // Debug logging
+  // Memoize derived maps to avoid new identity each render
+  const staticServersMap = useMemo(() => {
+    const list = ((serverDiscovery as any)?.servers || []) as Array<{ hostname?: string; metadata?: Record<string, any> }>;
+    return Object.fromEntries(list.map((s, i) => [s.hostname || `server_${i + 1}`, s.metadata || {}]));
+  }, [(serverDiscovery as any)?.servers]);
+
+  // Optional debug logging (enable with NEXT_PUBLIC_DEBUG_FORMS=true)
+  const lastDebugKeyRef = useRef<string | null>(null);
   useEffect(() => {
-    console.log('🔍 Client data loaded:', client);
+    if (!DEBUG_FORMS) return;
+    const key = JSON.stringify({ id: client?.id, serverDiscovery });
+    if (lastDebugKeyRef.current === key) return;
+    lastDebugKeyRef.current = key;
+    // eslint-disable-next-line no-console
+    console.log('🔍 Client data loaded:', { id: client?.id, name: client?.name, enabled: (client as any)?.enabled, logDirectory: (client as any)?.logDirectory, discovery: (client as any)?.discovery });
+    // eslint-disable-next-line no-console
     console.log('🔍 serverDiscovery from watch:', serverDiscovery);
-  }, [client, serverDiscovery]);
+  }, [client?.id, client?.name, (client as any)?.enabled, (client as any)?.logDirectory, (client as any)?.discovery, serverDiscovery, DEBUG_FORMS]);
 
   const onSubmit = (data: ClientConfigFormData) => {
     // Sync parser rules from textarea regardless of blur
@@ -85,10 +120,13 @@ export default function EditClientPage() {
     updateClient.mutate({ ...data, __originalId: originalIdRef.current || undefined } as any);
   };
 
-  const defaultClientConfig: Partial<ClientConfigFormData> = {
-    enabled: true,
-    parserRules: [],
-  };
+  const defaultClientConfig = useMemo<Partial<ClientConfigFormData>>(
+    () => ({
+      enabled: true,
+      parserRules: [],
+    }),
+    []
+  );
 
   return (
     <ConfigEditLayout
@@ -144,10 +182,18 @@ export default function EditClientPage() {
                   </div>
 
                   <div className="flex items-start space-x-3 rounded-md border p-4">
-                    <Switch
-                      id="enabled"
-                      checked={enabled}
-                      onCheckedChange={(checked) => setValue('enabled', checked)}
+                    <Controller
+                      control={form.control}
+                      name="enabled"
+                      render={({ field: { value = false, onChange, onBlur, ref } }) => (
+                        <Switch
+                          id="enabled"
+                          checked={!!value}
+                          onCheckedChange={onChange}
+                          onBlur={onBlur}
+                          ref={ref as any}
+                        />
+                      )}
                     />
                     <div className="space-y-1 flex-1">
                       <Label htmlFor="enabled" className="cursor-pointer">Enable this client</Label>
@@ -316,7 +362,7 @@ export default function EditClientPage() {
                   <div className="space-y-2">
                     <Label className="text-xs">Discovery method</Label>
                     <Select
-                      value={(serverDiscovery as any)?.type || 'static'}
+                      value={(serverDiscovery as any)?.type}
                       onValueChange={(v) => {
                         const baseDiscovery = { type: v as any };
                         // Clear type-specific fields when changing type
@@ -353,7 +399,7 @@ export default function EditClientPage() {
                         Manually define the list of servers for this client
                       </p>
                       <KeyValueEditor
-                        value={Object.fromEntries(((serverDiscovery as any)?.servers || []).map((s: any, i: number) => [s.hostname || `server_${i+1}`, s.metadata || {}]))}
+                        value={staticServersMap}
                         onChange={(obj) => setValue('serverDiscovery', { 
                           type: 'static', 
                           servers: Object.entries(obj).map(([hostname, metadata]) => ({ hostname, metadata })) 
@@ -479,7 +525,7 @@ export default function EditClientPage() {
                     <div className="space-y-2">
                       <Label>File type</Label>
                       <Select
-                        value={(fileType as any)?.type || 'text'}
+                        value={(fileType as any)?.type}
                         onValueChange={(v) => setValue('fileType', { ...(fileType || {}), type: v as any })}
                       >
                         <SelectTrigger>

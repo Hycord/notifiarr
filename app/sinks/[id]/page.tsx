@@ -3,7 +3,7 @@
 import { useParams, useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { useSink, useUpdateSink } from '@/hooks/use-config-queries';
 import { sinkConfigSchema, type SinkConfigFormData } from '@/lib/schemas';
 import { ConfigEditLayout } from '@/components/config-edit-layout';
@@ -48,6 +48,18 @@ export default function EditSinkPage() {
   const form = useForm<SinkConfigFormData>({
     resolver: zodResolver(sinkConfigSchema),
     mode: 'onChange',
+    // Exclude 'type' to avoid dirty state caused by initial default not matching loaded sink
+    defaultValues: {
+      id: id || '',
+      name: '',
+      enabled: true,
+      config: {},
+      template: {},
+      rateLimit: {},
+      allowedMetadata: [],
+      metadata: {},
+      payloadTransforms: [],
+    } as any,
   });
 
   const {
@@ -112,15 +124,18 @@ export default function EditSinkPage() {
     updateSink.mutate({ ...sanitized, __originalId: originalIdRef.current || undefined } as any);
   };
 
-  const defaultSinkConfig: Partial<SinkConfigFormData> = {
-    enabled: true,
-    config: {},
-    template: {},
-    rateLimit: {},
-    allowedMetadata: [],
-    metadata: {},
-    payloadTransforms: [],
-  };
+  const defaultSinkConfig = useMemo<Partial<SinkConfigFormData>>(
+    () => ({
+      enabled: true,
+      config: {},
+      template: {},
+      rateLimit: {},
+      allowedMetadata: [],
+      metadata: {},
+      payloadTransforms: [],
+    }),
+    []
+  );
 
   return (
     <ConfigEditLayout
@@ -162,7 +177,7 @@ export default function EditSinkPage() {
                   <div className="space-y-2">
                     <Label htmlFor="type">Notification type</Label>
                     <Select
-                      value={sinkType || sink?.type}
+                      value={sinkType || sink?.type || undefined}
                       onValueChange={(value) => setValue('type', value as any)}
                     >
                       <SelectTrigger>

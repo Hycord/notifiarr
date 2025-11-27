@@ -52,6 +52,8 @@ export function ConfigEditLayout<TFormData extends Record<string, any>>({
   const [codeContent, setCodeContent] = useState('');
   const [activeTab, setActiveTab] = useState('form');
   const { handleSubmit, reset, getValues, watch, formState } = form;
+  // Persist code editor mount to avoid Monaco background cancellation spam when switching tabs
+  const [editorMounted, setEditorMounted] = useState(false);
   const formValues = watch();
 
   const isCreate = createMode || (!data && !!defaultConfig);
@@ -127,19 +129,24 @@ export function ConfigEditLayout<TFormData extends Record<string, any>>({
     if (data && !isCreate) {
       reset(data, { keepDefaultValues: false });
       setCodeContent(JSON.stringify(data, null, 2));
-    } else if (isCreate && defaultConfig) {
+      return;
+    }
+    if (isCreate && defaultConfig) {
       const initialValues = getValues();
       const merged = { ...defaultConfig, ...initialValues } as TFormData;
       setCodeContent(JSON.stringify(merged, null, 2));
     }
-  }, [data, reset, getValues, isCreate, defaultConfig]);
+    // Intentionally exclude getValues/reset to avoid effect thrash and update loops
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, isCreate, defaultConfig]);
 
   useEffect(() => {
     if (activeTab === 'code') {
+      if (!editorMounted) setEditorMounted(true);
       const currentValues = getValues();
       setCodeContent(JSON.stringify(currentValues, null, 2));
     }
-  }, [activeTab, getValues]);
+  }, [activeTab, getValues, editorMounted]);
 
   const handleTabChange = (newTab: string) => {
     if (newTab === 'form' && activeTab === 'code') {
@@ -238,22 +245,29 @@ export function ConfigEditLayout<TFormData extends Record<string, any>>({
               </CardHeader>
               <CardContent className="p-0">
                 <div className="h-[400px] sm:h-[600px] border-t">
-                  <Editor
-                    height="100%"
-                    defaultLanguage="json"
-                    value={codeContent}
-                    onChange={(value) => setCodeContent(value || '')}
-                    theme={theme === 'dark' ? 'vs-dark' : 'light'}
-                    options={{
-                      minimap: { enabled: false },
-                      fontSize: 13,
-                      lineNumbers: 'on',
-                      scrollBeyondLastLine: false,
-                      automaticLayout: true,
-                      tabSize: 2,
-                      wordWrap: 'on',
-                    }}
-                  />
+                  {editorMounted && (
+                    <Editor
+                      height="100%"
+                      defaultLanguage="json"
+                      value={codeContent}
+                      onChange={(value) => setCodeContent(value || '')}
+                      theme={theme === 'dark' ? 'vs-dark' : 'light'}
+                      options={{
+                        minimap: { enabled: false },
+                        fontSize: 13,
+                        lineNumbers: 'on',
+                        scrollBeyondLastLine: false,
+                        automaticLayout: true,
+                        tabSize: 2,
+                        wordWrap: 'on',
+                      }}
+                    />
+                  )}
+                  {!editorMounted && (
+                    <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                      Loading editor...
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

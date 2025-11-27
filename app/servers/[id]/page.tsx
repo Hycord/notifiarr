@@ -11,7 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useMemo } from 'react';
 import { UsersEditor } from '@/components/forms/users-editor';
 import { KeyValueEditor } from '@/components/forms/key-value-editor';
 
@@ -46,6 +46,18 @@ export default function EditServerPage() {
   const form = useForm<ServerConfigFormData>({
     resolver: zodResolver(serverConfigSchema),
     mode: 'onChange',
+    defaultValues: {
+      id: id || '',
+      hostname: '',
+      displayName: '',
+      clientNickname: '',
+      network: '',
+      port: 6667,
+      tls: false,
+      enabled: true,
+      users: {},
+      metadata: {},
+    } as any,
   });
 
   const {
@@ -66,14 +78,17 @@ export default function EditServerPage() {
     updateServer.mutate({ ...data, __originalId: originalIdRef.current || undefined } as any);
   };
 
-  const defaultServerConfig: Partial<ServerConfigFormData> = {
-    enabled: true,
-    tls: false,
-    port: 6667,
-    network: '',
-    users: {},
-    metadata: {},
-  };
+  const defaultServerConfig = useMemo<Partial<ServerConfigFormData>>(
+    () => ({
+      enabled: true,
+      tls: false,
+      port: 6667,
+      network: '',
+      users: {},
+      metadata: {},
+    }),
+    []
+  );
 
   return (
     <ConfigEditLayout

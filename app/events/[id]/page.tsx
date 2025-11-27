@@ -160,17 +160,17 @@ export default function EditEventPage() {
   const form = useForm<EventConfigFormData>({
     resolver: zodResolver(eventConfigSchema),
     mode: 'onChange',
+    // Exclude baseEvent from defaultValues to prevent initial dirty state on edit pages
     defaultValues: {
       id,
       name: '',
       enabled: true,
-      baseEvent: 'message',
       serverIds: [],
       sinkIds: [],
       priority: 0,
       metadata: {},
       filters: { operator: 'and', filters: [] },
-    },
+    } as any,
   });
 
   const {
@@ -229,15 +229,18 @@ export default function EditEventPage() {
     }
   };
 
-  const defaultEventConfig: Partial<EventConfigFormData> = {
-    enabled: true,
-    baseEvent: 'message',
-    priority: 0,
-    serverIds: [],
-    sinkIds: [],
-    filters: { operator: 'and', filters: [] },
-    metadata: {},
-  };
+  const defaultEventConfig = React.useMemo<Partial<EventConfigFormData>>(
+    () => ({
+      enabled: true,
+      baseEvent: 'message',
+      priority: 0,
+      serverIds: [],
+      sinkIds: [],
+      filters: { operator: 'and', filters: [] },
+      metadata: {},
+    }),
+    []
+  );
 
   return (
     <ConfigEditLayout
@@ -252,6 +255,7 @@ export default function EditEventPage() {
       isPending={isMissing ? createEvent.isPending : updateEvent.isPending}
       onSubmit={onSubmit}
       defaultConfig={defaultEventConfig}
+      createMode={isMissing}
     >
               <Card>
                 <CardHeader>
@@ -279,9 +283,8 @@ export default function EditEventPage() {
                   <div className="space-y-2">
                     <Label htmlFor="baseEvent">Event type to monitor</Label>
                     <Select
-                      value={baseEvent ?? undefined}
+                      value={baseEvent || (isMissing ? 'message' : event?.baseEvent) || undefined}
                       onValueChange={(value) => setValue('baseEvent', value as any)}
-                      defaultValue={event?.baseEvent as any}
                     >
                       <SelectTrigger>
                         <SelectValue placeholder="Select event type" />
