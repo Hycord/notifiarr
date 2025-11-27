@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  irc-notify-backend:
+    image: ghcr.io/hycord/irc-notify:latest
+    container_name: irc-notify-backend
+    environment:
+      # API server configuration
+      - ENABLE_API=true
+      - API_PORT=3001
+      - API_HOST=0.0.0.0
+      - LOG_DIR=/logs
+    volumes:
+      - /path/to/config/dir:/app/config
+      - /path/to/logs/dir:/logs
+    restart: unless-stopped
+    networks:
+      - notifiarr-network
+    # Do not expose ports publicly - only internal network access
+
+  notifiarr:
+    image: ghcr.io/hycord/notifiarr:latest
+    container_name: notifiarr-ui
+    ports:
+      - "3000:3000"
+    environment:
+      # Server Configuration
+      - PORT=3000
+      - HOSTNAME=0.0.0.0
+      
+      # Backend API Configuration - internal network communication
+      - BACKEND_API_URL=http://irc-notify-backend:3001
+      
+      # API Authentication
+      - NEXT_PUBLIC_API_TOKEN=
+      
+      # Node Environment
+      - NODE_ENV=production
+    restart: unless-stopped
+    networks:
+      - notifiarr-network
+    depends_on:
+      - irc-notify-backend
+
+networks:
+  notifiarr-network:
+    driver: bridge
